@@ -25,6 +25,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	var err error = nil
 	switch action {
+	case "health":
+		err = handleHealth(w, r, remainder)
 	case "remember":
 		err = handleRemember(w, r, remainder)
 	case "greet":
@@ -40,6 +42,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		fmt.Fprintf(w, "An error occured while action %s was performed", action)
 	}
+}
+
+func handleHealth(w http.ResponseWriter, r *http.Request, remainderPath string) error {
+	w.WriteHeader(200)
+	fmt.Fprintf(w, "Working")
+
+	return nil
 }
 
 func handleRemember(w http.ResponseWriter, r *http.Request, remainderPath string) error {

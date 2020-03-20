@@ -45,10 +45,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request, remainderPath string) error {
-	w.WriteHeader(200)
-	fmt.Fprintf(w, "Working")
+	_, err := getDB()
+	if err == nil {
+		w.WriteHeader(200)
+		fmt.Fprintf(w, "Working")
+	}
 
-	return nil
+	return err
 }
 
 func handleRemember(w http.ResponseWriter, r *http.Request, remainderPath string) error {
@@ -88,7 +91,7 @@ func main() {
 		panic("No datasource specified, either hand it over as first argument to the cli or set GOGREETING_DATASOURCE")
 	}
 
-	initDB(dataSource)
+	setDataSource(dataSource)
 
 	http.HandleFunc("/", handler)
 	log.Printf("Listening on port %d", port)

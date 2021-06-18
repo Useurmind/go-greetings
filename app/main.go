@@ -6,7 +6,12 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/Useurmind/go-greetings/pkg/db"
 )
+
+var dbType string = ""
+var dataSource string = ""
 
 func splitOutFirstPathPart(path string) (string, string) {
 	parts := strings.SplitN(path, "/", 2)
@@ -24,13 +29,20 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Handling request to path %s, action is %s, remainder is %s", r.URL.Path, action, remainder)
 
 	var err error = nil
+	ctx, err := db.NewDBContext(dbType, dataSource)
+	if err != nil {
+		log.Printf("ERROR while creating db context: %v", err)
+		w.WriteHeader(500)
+		return
+	}
+
 	switch action {
 	case "health":
-		err = handleHealth(w, r, remainder)
+		err = handleHealth(ctx, w, r, remainder)
 	case "remember":
-		err = handleRemember(w, r, remainder)
+		err = handleRemember(ctx, w, r, remainder)
 	case "greet":
-		err = handleGreet(w, r, remainder)
+		err = handleGreet(ctx, w, r, remainder)
 	default:
 		w.WriteHeader(404)
 		fmt.Fprintf(w, "Unkown path")
@@ -44,20 +56,17 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleHealth(w http.ResponseWriter, r *http.Request, remainderPath string) error {
-	_, err := getDB()
-	if err == nil {
-		w.WriteHeader(200)
-		fmt.Fprintf(w, "Working")
-	}
+func handleHealth(ctx db.DBContext, w http.ResponseWriter, r *http.Request, remainderPath string) error {
+	w.WriteHeader(200)
+	fmt.Fprintf(w, "Working")
 
-	return err
+	return nil
 }
 
-func handleRemember(w http.ResponseWriter, r *http.Request, remainderPath string) error {
+func handleRemember(ctx db.DBContext, w http.ResponseWriter, r *http.Request, remainderPath string) error {
 	rememberedPerson, greeting := splitOutFirstPathPart(remainderPath)
 
-	err := saveGreeting(rememberedPerson, greeting)
+	err := ctx.SaveGreeting(rememberedPerson, greeting)
 	if err != nil {
 		return err
 	}
@@ -66,10 +75,10 @@ func handleRemember(w http.ResponseWriter, r *http.Request, remainderPath string
 	return nil
 }
 
-func handleGreet(w http.ResponseWriter, r *http.Request, remainderPath string) error {
+func handleGreet(ctx db.DBContext, w http.ResponseWriter, r *http.Request, remainderPath string) error {
 	rememberedPerson, _ := splitOutFirstPathPart(remainderPath)
 
-	greeting, err := getGreeting(rememberedPerson)
+	greeting, err := ctx.GetGreeting(rememberedPerson)
 	if err != nil {
 		return err
 	}
@@ -81,17 +90,16 @@ func handleGreet(w http.ResponseWriter, r *http.Request, remainderPath string) e
 func main() {
 	port := 8080
 
-	var dataSource string
-	if len(os.Args) > 1 {
-		dataSource = os.Args[1]
-	} else {
-		dataSource = os.Getenv("GOGREETING_DATASOURCE")
+	dbType = os.Getenv("GOGREETING_DBTYPE")
+	dataSource = os.Getenv("GOGREETING_DATASOURCE")
+	if dbType == "" {
+		panic("No db type specified, set GOGREETING_DBTYPE")
 	}
 	if dataSource == "" {
-		panic("No datasource specified, either hand it over as first argument to the cli or set GOGREETING_DATASOURCE")
+		panic("No datasource specified, set GOGREETING_DATASOURCE")
 	}
 
-	setDataSource(dataSource)
+	fmt.Printf("Using %s\r\n", dbType)
 
 	http.HandleFunc("/", handler)
 	log.Printf("Listening on port %d", port)
